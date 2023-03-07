@@ -1,0 +1,3 @@
+plyer
+pypiwin32
+winshell
