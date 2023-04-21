@@ -1,5 +1,6 @@
-from PyQt5 import QtGui, QtWidgets
+from PyQt5 import QtGui, QtWidgets, QtCore
 from moviepy import editor
+import configparser
 import webbrowser
 import sys
 import os
@@ -38,6 +39,75 @@ class AboutDialog(QtWidgets.QDialog):
         horizontal_layout.addWidget(btn_telegram)
 
 
+class SettingDialog(QtWidgets.QDialog):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setWindowTitle("Setting")
+        self.setFixedSize(250, 170)
+
+        self.centralwidget = QtWidgets.QWidget(self)
+
+
+        self.gridWidget = QtWidgets.QWidget(self.centralwidget)
+        self.gridWidget.setGeometry(QtCore.QRect(20, 10, 200, 150))
+
+        self.gridLayout = QtWidgets.QGridLayout(self.gridWidget)
+        self.gridLayout.setContentsMargins(0, 0, 0, 0)
+
+
+        self.label_fps = QtWidgets.QLabel(self.gridWidget)
+        self.label_fps.setText('FPS: ')
+        self.gridLayout.addWidget(self.label_fps, 1, 0, 1, 1)
+
+        self.lineEdit_fps = QtWidgets.QLineEdit(self.gridWidget)
+        self.gridLayout.addWidget(self.lineEdit_fps, 1, 1, 1, 1)
+
+
+        self.label_bitrate = QtWidgets.QLabel(self.gridWidget)
+        self.label_bitrate.setText('Bitrate: ')
+        self.gridLayout.addWidget(self.label_bitrate, 2, 0, 1, 1)
+
+        self.lineEdit_bitrate = QtWidgets.QLineEdit(self.gridWidget)
+        self.gridLayout.addWidget(self.lineEdit_bitrate, 2, 1, 1, 1)
+
+
+        self.pushButton_reload = QtWidgets.QPushButton(self.gridWidget)
+        self.pushButton_reload.setText('Reload')
+        self.pushButton_reload.clicked.connect(self.reload)
+        self.gridLayout.addWidget(self.pushButton_reload, 3, 0, 1, 1)
+
+        self.pushButton_submit = QtWidgets.QPushButton(self.gridWidget)
+        self.pushButton_submit.setText('Submit')
+        self.pushButton_submit.clicked.connect(self.submit)
+        self.gridLayout.addWidget(self.pushButton_submit, 3, 1, 1, 1)
+
+
+        self.reload()
+
+    def get_dict(self):
+        return {
+            'fps': self.lineEdit_fps.text(),
+            'bitrate': self.lineEdit_bitrate.text()
+        }
+
+    def reload(self):
+        parser = configparser.ConfigParser()
+        parser.read(CONFIGS_PATH)
+        configs = dict(parser['Audio'])
+
+        self.lineEdit_fps.setText(configs['fps'])
+        self.lineEdit_bitrate.setText(configs['bitrate'])
+
+    def submit(self):
+        if QtWidgets.QMessageBox.question(self, 'Submit', 'Are sure to save new configs?') == 16384:  # No=65536, Yes=16384
+            parser = configparser.ConfigParser()
+            parser.read_dict({'Audio': self.get_dict()})
+            with open(CONFIGS_PATH, 'w') as handler:
+                parser.write(handler)
+
+            QtWidgets.QMessageBox.information(self, 'Submit', 'The new settings have set')
+
+
 class Window(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
@@ -68,12 +138,17 @@ class Window(QtWidgets.QMainWindow):
         self.init_menu()
 
     def extract_audio(self):
+        parser = configparser.ConfigParser()
+        parser.read(CONFIGS_PATH)
+        options = dict(parser['Audio'])
+        options['fps'] = int(options['fps'])
+
         path = self.video_path.text()
         if path:
             save_path, _ = QtWidgets.QFileDialog.getSaveFileName(self, 'Save Audio File', '', "Audio Files (*.mp3)")
             if save_path:
                 video = editor.VideoFileClip(path)
-                video.audio.write_audiofile(save_path)
+                video.audio.write_audiofile(save_path, **options)
                 video.close()
 
                 QtWidgets.QMessageBox.information(self, 'Audio Extracted', '\nAudio of your file successfully exported!\t\n')
@@ -88,15 +163,30 @@ class Window(QtWidgets.QMainWindow):
             self.video_path.setText(path)
 
     def init_menu(self):
+        settingAction = QtWidgets.QAction('Setting', self)
+        settingAction.triggered.connect(lambda: SettingDialog(self).exec_())
+
         aboutAction = QtWidgets.QAction('About us', self)
         aboutAction.triggered.connect(lambda: self.aboutDialog.exec_())
 
         menu = self.menuBar()
+        menu.addAction(settingAction)
         menu.addAction(aboutAction)
 
 
 
 ICON_PATH = 'icon.ico'
+CONFIGS_PATH = os.path.expanduser(r'~\audio-extractor-configs.ini')
+DEFAULT_CONFIGS = {
+    'fps': '44100',
+    'bitrate': '160K',
+}
+
+if not os.path.exists(CONFIGS_PATH):
+    parser = configparser.ConfigParser()
+    parser.read_dict({'Audio': DEFAULT_CONFIGS})
+    with open(CONFIGS_PATH, 'w') as handler:
+        parser.write(handler)
 
 
 if __name__ == "__main__":
