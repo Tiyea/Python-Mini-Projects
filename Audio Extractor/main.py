@@ -42,7 +42,6 @@ class Window(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.aboutDialog = AboutDialog()
-        self.video = None
         self.setup_Ui()
         self.show()
 
@@ -69,11 +68,13 @@ class Window(QtWidgets.QMainWindow):
         self.init_menu()
 
     def extract_audio(self):
-        if self.video:
+        path = self.video_path.text()
+        if path:
             save_path, _ = QtWidgets.QFileDialog.getSaveFileName(self, 'Save Audio File', '', "Audio Files (*.mp3)")
             if save_path:
-                self.video.audio.write_audiofile(save_path)
-                self.video.close()
+                video = editor.VideoFileClip(path)
+                video.audio.write_audiofile(save_path)
+                video.close()
 
                 QtWidgets.QMessageBox.information(self, 'Audio Extracted', '\nAudio of your file successfully exported!\t\n')
 
@@ -84,7 +85,6 @@ class Window(QtWidgets.QMainWindow):
         path, _ = QtWidgets.QFileDialog.getOpenFileName(self, 'Open Video File', '', "Video Files (*.mp4)")
         if path:
             path = os.path.normpath(path)
-            self.video = editor.VideoFileClip(path)
             self.video_path.setText(path)
 
     def init_menu(self):
